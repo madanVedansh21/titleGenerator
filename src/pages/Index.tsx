@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Lightbulb, TrendingUp, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { UserMenu } from "@/components/auth/UserMenu";
 
 interface ContentIdea {
   title: string;
@@ -144,7 +145,12 @@ Angle:
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 relative">
+          {/* User Menu in top right */}
+          <div className="absolute top-0 right-0">
+            <UserMenu />
+          </div>
+          
           <div className="flex justify-center items-center gap-3 mb-4">
             <div className="p-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full">
               <Lightbulb className="h-8 w-8 text-white" />
