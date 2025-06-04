@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,7 +64,7 @@ Format:
 Angle:
 ---`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -80,11 +79,20 @@ Angle:
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate content ideas');
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('API Response:', data);
+      
+      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+        throw new Error('Invalid response structure from API');
+      }
+      
       const generatedText = data.candidates[0].content.parts[0].text;
+      console.log('Generated text:', generatedText);
       
       // Parse the response
       const ideas = parseContentIdeas(generatedText);
