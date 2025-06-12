@@ -43,60 +43,31 @@ const Index = () => {
     setIsLoading(true);
     
     try {
-      const API_KEY = "AIzaSyDtil4jHKrTUmcm8wM1xqHHsM2ojCrnUQA";
-      const prompt = `You are a content strategist assistant. Based on the following trending topics and keyword, generate 5 highly creative and relevant content ideas. Focus on originality, engagement, and trend relevance.
-
-Main Keyword: "${mainKeyword}"
-
-Trending Terms (from Google Trends): ${trendingKeywords || "No specific trending terms provided"}
-
-Use a mix of formats like videos, blog posts, carousels, or threads. Vary the approach: practical, emotional, data-driven, controversial, or inspiring.
-
-For each idea, give:
-
-Title: [Catchy, specific, trend-aware title]  
-Format: [Blog, Video, Twitter Thread, Reel, etc.]  
-Angle: [Unique POV or creative hook]
-
-Respond in this format for 5 content ideas:
----
-Title:  
-Format:  
-Angle:
----`;
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+      const token = localStorage.getItem('auth_token');
+      
+      const response = await fetch('/api/generate-content', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }]
+          mainKeyword,
+          trendingKeywords
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json();
         console.error('API Error:', errorData);
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        throw new Error(errorData.error || `API request failed: ${response.status}`);
       }
 
       const data = await response.json();
       console.log('API Response:', data);
       
-      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-        throw new Error('Invalid response structure from API');
-      }
-      
-      const generatedText = data.candidates[0].content.parts[0].text;
-      console.log('Generated text:', generatedText);
-      
       // Parse the response
-      const ideas = parseContentIdeas(generatedText);
+      const ideas = parseContentIdeas(data.content);
       setContentIdeas(ideas);
       
       if (ideas.length > 0) {

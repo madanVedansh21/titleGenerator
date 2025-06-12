@@ -1,20 +1,20 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "wouter";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { Lightbulb } from "lucide-react";
 
 const AuthPage = () => {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     if (user && !loading) {
-      navigate('/', { replace: true });
+      setLocation('/');
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, setLocation]);
 
   const toggleMode = () => {
     setMode(mode === 'signin' ? 'signup' : 'signin');

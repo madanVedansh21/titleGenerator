@@ -110,6 +110,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Content generation API route
+  app.post("/api/generate-content", authenticateToken, async (req: any, res) => {
+    try {
+      const { mainKeyword, trendingKeywords } = req.body;
+      
+      if (!mainKeyword) {
+        return res.status(400).json({ error: "Main keyword is required" });
+      }
+
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_API_KEY) {
+        return res.status(500).json({ error: "Gemini API key not configured" });
+      }
+
+      const prompt = `You are a content strategist assistant. Based on the following trending topics and keyword, generate 5 highly creative and relevant content ideas. Focus on originality, engagement, and trend relevance.
+
+Main Keyword: "${mainKeyword}"
+
+Trending Terms (from Google Trends): ${trendingKeywords || "No specific trending terms provided"}
+
+Use a mix of formats like videos, blog posts, carousels, or threads. Vary the approach: practical, emotional, data-driven, controversial, or inspiring.
+
+For each idea, give:
+
+Title: [Catchy, specific, trend-aware title]  
+Format: [Blog, Video, Twitter Thread, Reel, etc.]  
+Angle: [Unique POV or creative hook]
+
+Respond in this format for 5 content ideas:
+---
+Title:  
+Format:  
+Angle:
+---`;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Gemini API Error:', errorData);
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+        throw new Error('Invalid response structure from API');
+      }
+      
+      const generatedText = data.candidates[0].content.parts[0].text;
+      res.json({ content: generatedText });
+    } catch (error) {
+      console.error("Content generation error:", error);
+      res.status(500).json({ error: "Failed to generate content" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
