@@ -3,15 +3,103 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import passport from "passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { insertUserSchema } from "@shared/schema";
+import { supabase } from "./db";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
+// Configure Passport
+passport.serializeUser((user: any, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser(async (id: number, done) => {
+  try {
+    const user = await storage.getUser(id);
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+});
+
+// Google OAuth Strategy
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID!,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  callbackURL: "/api/auth/google/callback"
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    // Check if user exists with Google ID
+    let user = await storage.getUserByGoogleId(profile.id);
+    
+    if (!user) {
+      // Check if user exists with email
+      user = await storage.getUserByEmail(profile.emails?.[0]?.value || '');
+      
+      if (user) {
+        // Update existing user with Google ID
+        user = await storage.updateUserGoogleId(user.id, profile.id, profile.photos?.[0]?.value);
+      } else {
+        // Create new user
+        user = await storage.createUser({
+          email: profile.emails?.[0]?.value || '',
+          fullName: profile.displayName,
+          googleId: profile.id,
+          profileImage: profile.photos?.[0]?.value,
+          authProvider: 'google'
+        });
+      }
+    }
+    
+    return done(null, user);
+  } catch (error) {
+    return done(error, null);
+  }
+}));
+
+// Google OAuth routes
+app.get("/api/auth/google", passport.authenticate("google", {
+  scope: ["profile", "email"]
+}));
+
+app.get("/api/auth/google/callback", passport.authenticate("google", {
+  failureRedirect: "/auth?error=google_auth_failed"
+}), async (req, res) => {
+  try {
+    const user = req.user as any;
+    
+    // Generate JWT token for authenticated user
+    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
+      expiresIn: "24h"
+    });
+    
+    // Redirect to frontend with token
+    res.redirect(`/?token=${token}&user=${encodeURIComponent(JSON.stringify({
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      profileImage: user.profileImage
+    }))}`);
+  } catch (error) {
+    console.error("Google callback error:", error);
+    res.redirect("/auth?error=callback_failed");
+  }
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize passport
+  app.use(passport.initialize());
+  
   // Authentication routes
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { email, password, fullName } = insertUserSchema.parse(req.body);
+      const { email, password, fullName } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
       
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(email);
@@ -26,7 +114,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.createUser({
         email,
         password: hashedPassword,
-        fullName
+        fullName,
+        authProvider: 'email'
       });
 
       // Generate JWT token
@@ -48,9 +137,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email, password } = req.body;
       
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+      
       // Find user
       const user = await storage.getUserByEmail(email);
-      if (!user) {
+      if (!user || !user.password) {
         return res.status(400).json({ error: "Invalid credentials" });
       }
 

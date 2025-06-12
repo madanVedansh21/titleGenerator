@@ -5,7 +5,9 @@ import { eq, and } from "drizzle-orm";
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByGoogleId(googleId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserGoogleId(id: number, googleId: string, profileImage?: string): Promise<User>;
   getUsageByIpAndDate(ipAddress: string, date: string): Promise<UsageTracking | undefined>;
   createOrUpdateUsage(usage: InsertUsageTracking): Promise<UsageTracking>;
 }
@@ -25,6 +27,24 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .insert(users)
       .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.googleId, googleId));
+    return user || undefined;
+  }
+
+  async updateUserGoogleId(id: number, googleId: string, profileImage?: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        googleId,
+        profileImage,
+        authProvider: 'google'
+      })
+      .where(eq(users.id, id))
       .returning();
     return user;
   }
