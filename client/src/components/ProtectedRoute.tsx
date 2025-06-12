@@ -10,13 +10,13 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     if (!loading && !user) {
-      navigate('/auth', { replace: true });
+      setLocation('/auth');
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, setLocation]);
 
   if (loading) {
     return (
