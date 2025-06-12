@@ -110,13 +110,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Content generation API route (no authentication required)
+  // Content generation API route with usage limiting
   app.post("/api/generate-content", async (req: any, res) => {
     try {
       const { mainKeyword, trendingKeywords } = req.body;
       
       if (!mainKeyword) {
         return res.status(400).json({ error: "Main keyword is required" });
+      }
+
+      // Get user's IP address
+      const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+
+      // Check if user is authenticated
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+      let isAuthenticated = false;
+
+      if (token) {
+        try {
+          jwt.verify(token, JWT_SECRET);
+          isAuthenticated = true;
+        } catch (err) {
+          // Token is invalid, treat as unauthenticated
+        }
+      }
+
+      // If not authenticated, check usage limits
+      if (!isAuthenticated) {
+        const usage = await storage.getUsageByIpAndDate(ipAddress, today);
+        if (usage && usage.generationCount >= 2) {
+          return res.status(429).json({ 
+            error: "Daily limit reached. Please sign up or log in to generate more content ideas.",
+            requiresAuth: true 
+          });
+        }
       }
 
       const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
