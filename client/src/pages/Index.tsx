@@ -4,10 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Lightbulb, TrendingUp, Sparkles, Loader2, User } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Lightbulb, TrendingUp, Sparkles, Loader2, User, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserMenu } from "@/components/auth/UserMenu";
+import { AuthCard } from "@/components/auth/AuthCard";
 
 interface ContentIdea {
   title: string;
@@ -21,6 +23,8 @@ const Index = () => {
   const [trendingKeywords, setTrendingKeywords] = useState("");
   const [contentIdeas, setContentIdeas] = useState<ContentIdea[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
 
   const formatBadgeColor = (format: string) => {
     const colors = {
@@ -45,11 +49,21 @@ const Index = () => {
     setIsLoading(true);
     
     try {
+      const headers: any = {
+        'Content-Type': 'application/json'
+      };
+
+      // Add authorization header if user is logged in
+      if (user) {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+      }
+
       const response = await fetch('/api/generate-content', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify({
           mainKeyword,
           trendingKeywords
@@ -58,12 +72,19 @@ const Index = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
+        
+        if (response.status === 429 && errorData.requiresAuth) {
+          toast.error("Daily limit reached! Sign up or log in to generate more ideas.");
+          setShowAuthDialog(true);
+          setAuthMode('signup');
+          return;
+        }
+        
         console.error('API Error:', errorData);
         throw new Error(errorData.error || `API request failed: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('API Response:', data);
       
       // Parse the response
       const ideas = parseContentIdeas(data.content);
@@ -116,9 +137,31 @@ const Index = () => {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-12 relative">
-          {/* User Menu in top right */}
-          <div className="absolute top-0 right-0">
-            <UserMenu />
+          {/* User Menu and Auth Button in top right */}
+          <div className="absolute top-0 right-0 flex items-center gap-2">
+            {user ? (
+              <UserMenu />
+            ) : (
+              <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Sign In
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {authMode === 'signin' ? 'Sign In' : 'Sign Up'}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <AuthCard 
+                    mode={authMode} 
+                    onToggleMode={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
           
           <div className="flex justify-center items-center gap-3 mb-4">
@@ -132,6 +175,14 @@ const Index = () => {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Generate creative, trend-aware content ideas that drive engagement and capture your audience's attention
           </p>
+          {!user && (
+            <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <Lock className="h-4 w-4 text-yellow-600" />
+              <span className="text-sm text-yellow-700">
+                Free users get 2 generations per day. Sign up for unlimited access!
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Input Form */}

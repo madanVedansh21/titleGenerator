@@ -201,6 +201,15 @@ Angle:
       }
       
       const generatedText = data.candidates[0].content.parts[0].text;
+      
+      // Track usage for unauthenticated users
+      if (!isAuthenticated) {
+        await storage.createOrUpdateUsage({
+          ipAddress,
+          usageDate: today,
+        });
+      }
+      
       res.json({ content: generatedText });
     } catch (error) {
       console.error("Content generation error:", error);
