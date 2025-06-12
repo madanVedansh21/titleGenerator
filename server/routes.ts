@@ -59,38 +59,38 @@ passport.use(new GoogleStrategy({
   }
 }));
 
-// Google OAuth routes
-app.get("/api/auth/google", passport.authenticate("google", {
-  scope: ["profile", "email"]
-}));
-
-app.get("/api/auth/google/callback", passport.authenticate("google", {
-  failureRedirect: "/auth?error=google_auth_failed"
-}), async (req, res) => {
-  try {
-    const user = req.user as any;
-    
-    // Generate JWT token for authenticated user
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
-      expiresIn: "24h"
-    });
-    
-    // Redirect to frontend with token
-    res.redirect(`/?token=${token}&user=${encodeURIComponent(JSON.stringify({
-      id: user.id,
-      email: user.email,
-      fullName: user.fullName,
-      profileImage: user.profileImage
-    }))}`);
-  } catch (error) {
-    console.error("Google callback error:", error);
-    res.redirect("/auth?error=callback_failed");
-  }
-});
-
 export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize passport
   app.use(passport.initialize());
+  
+  // Google OAuth routes
+  app.get("/api/auth/google", passport.authenticate("google", {
+    scope: ["profile", "email"]
+  }));
+
+  app.get("/api/auth/google/callback", passport.authenticate("google", {
+    failureRedirect: "/auth?error=google_auth_failed"
+  }), async (req, res) => {
+    try {
+      const user = req.user as any;
+      
+      // Generate JWT token for authenticated user
+      const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
+        expiresIn: "24h"
+      });
+      
+      // Redirect to frontend with token
+      res.redirect(`/?token=${token}&user=${encodeURIComponent(JSON.stringify({
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        profileImage: user.profileImage
+      }))}`);
+    } catch (error) {
+      console.error("Google callback error:", error);
+      res.redirect("/auth?error=callback_failed");
+    }
+  });
   
   // Authentication routes
   app.post("/api/auth/signup", async (req, res) => {
