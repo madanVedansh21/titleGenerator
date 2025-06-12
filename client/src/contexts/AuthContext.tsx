@@ -1,12 +1,19 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+interface User {
+  id: number;
+  email: string;
+  fullName: string | null;
+}
+
+interface AuthError {
+  message: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
@@ -18,108 +25,111 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('Auth state changed:', event, session);
-        setSession(session);
-        setUser(session?.user ?? null);
+    // Check for existing token in localStorage
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      // Verify token and get user data
+      fetch('/api/user', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      .then(res => {
+        if (res.ok) {
+          return res.json();
+        }
+        throw new Error('Invalid token');
+      })
+      .then(userData => {
+        setUser(userData);
         setLoading(false);
-      }
-    );
-
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      })
+      .catch(() => {
+        localStorage.removeItem('auth_token');
+        setLoading(false);
+      });
+    } else {
       setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    }
   }, []);
 
   const signUp = async (email: string, password: string, fullName?: string) => {
     try {
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: fullName ? { full_name: fullName } : undefined
-        }
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password, fullName })
       });
 
-      if (error) {
+      const data = await response.json();
+
+      if (!response.ok) {
+        const error = { message: data.error || 'Signup failed' };
         toast.error(error.message);
         return { error };
       }
 
-      toast.success('Check your email for the confirmation link!');
+      // Store token and set user
+      localStorage.setItem('auth_token', data.token);
+      setUser(data.user);
+      toast.success('Account created successfully!');
       return { error: null };
     } catch (error) {
-      const authError = error as AuthError;
-      toast.error('An unexpected error occurred');
+      const authError = { message: 'An unexpected error occurred' };
+      toast.error(authError.message);
       return { error: authError };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const response = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password })
       });
 
-      if (error) {
+      const data = await response.json();
+
+      if (!response.ok) {
+        const error = { message: data.error || 'Sign in failed' };
         toast.error(error.message);
         return { error };
       }
 
+      // Store token and set user
+      localStorage.setItem('auth_token', data.token);
+      setUser(data.user);
       toast.success('Welcome back!');
       return { error: null };
     } catch (error) {
-      const authError = error as AuthError;
-      toast.error('An unexpected error occurred');
+      const authError = { message: 'An unexpected error occurred' };
+      toast.error(authError.message);
       return { error: authError };
     }
   };
 
   const signInWithGoogle = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/`
-        }
-      });
-
-      if (error) {
-        toast.error(error.message);
-        return { error };
-      }
-
-      return { error: null };
-    } catch (error) {
-      const authError = error as AuthError;
-      toast.error('An unexpected error occurred');
-      return { error: authError };
-    }
+    // Google OAuth not implemented in this migration
+    // Returning error to maintain interface compatibility
+    const error = { message: 'Google sign-in not available in this version' };
+    toast.error(error.message);
+    return { error };
   };
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        toast.error(error.message);
-      } else {
-        toast.success('Signed out successfully');
-      }
+      await fetch('/api/auth/signout', { method: 'POST' });
+      localStorage.removeItem('auth_token');
+      setUser(null);
+      toast.success('Signed out successfully');
     } catch (error) {
       toast.error('An unexpected error occurred while signing out');
     }
@@ -127,7 +137,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value = {
     user,
-    session,
     loading,
     signUp,
     signIn,
