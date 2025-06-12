@@ -110,8 +110,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Content generation API route
-  app.post("/api/generate-content", authenticateToken, async (req: any, res) => {
+  // Content generation API route (no authentication required)
+  app.post("/api/generate-content", async (req: any, res) => {
     try {
       const { mainKeyword, trendingKeywords } = req.body;
       

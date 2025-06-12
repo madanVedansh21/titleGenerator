@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Lightbulb, TrendingUp, Sparkles, Loader2 } from "lucide-react";
+import { Lightbulb, TrendingUp, Sparkles, Loader2, User } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { UserMenu } from "@/components/auth/UserMenu";
 
 interface ContentIdea {
@@ -15,6 +16,7 @@ interface ContentIdea {
 }
 
 const Index = () => {
+  const { user } = useAuth();
   const [mainKeyword, setMainKeyword] = useState("");
   const [trendingKeywords, setTrendingKeywords] = useState("");
   const [contentIdeas, setContentIdeas] = useState<ContentIdea[]>([]);
@@ -43,13 +45,10 @@ const Index = () => {
     setIsLoading(true);
     
     try {
-      const token = localStorage.getItem('auth_token');
-      
       const response = await fetch('/api/generate-content', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           mainKeyword,

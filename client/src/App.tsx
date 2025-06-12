@@ -20,14 +20,7 @@ const App = () => (
       <Router>
         <AuthProvider>
           <Route path="/auth" component={AuthPage} />
-          <Route 
-            path="/" 
-            component={() => (
-              <ProtectedRoute>
-                <Index />
-              </ProtectedRoute>
-            )} 
-          />
+          <Route path="/" component={Index} />
           <Route path="*" component={NotFound} />
         </AuthProvider>
       </Router>
